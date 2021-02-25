@@ -131,6 +131,23 @@ class Iso7816Commands(CommandSet):
 		self._cmd.poutput(directory_str)
 		self._cmd.poutput("%d files" % len(file_list))
 
+	def walk(self, indent = 0, action = None):
+		"""Recursively walk through the file system, starting at the currently selected DF"""
+		files = self._cmd.rs.selected_file.get_selectable_names(flags = ['NAMES', 'APPS'])
+		for f in files:
+			if not action:
+				print ("  " * indent + str(f))
+			if f[0:2] == "DF" or f[0:3] == 'ADF':
+				fcp_dec = self._cmd.rs.select(f, self._cmd)
+				self.walk(indent + 1, action)
+				fcp_dec = self._cmd.rs.select("..", self._cmd)
+			elif action:
+				action(f)
+
+	def do_tree(self, opts):
+		"""Display a filesystem-tree with all selectable files"""
+		self.walk()
+
 
 
 @with_default_category('USIM Commands')
