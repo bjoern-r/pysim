@@ -580,6 +580,8 @@ class RuntimeState(object):
     def select(self, name, cmd_app=None):
         """Change current directory"""
         sels = self.selected_file.get_selectables()
+        sels = {k.upper(): v for k, v in sels.items()}
+        name = name.upper()
         if name in sels:
             f = sels[name]
             # unregister commands of old file
