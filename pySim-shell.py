@@ -148,6 +148,47 @@ class Iso7816Commands(CommandSet):
 		"""Display a filesystem-tree with all selectable files"""
 		self.walk()
 
+	def export(self, filename):
+		path_list = self._cmd.rs.selected_file.fully_qualified_path(True)
+		path_list_fid = self._cmd.rs.selected_file.fully_qualified_path(False)
+		self._cmd.poutput("# directory:%s (%s)" % ('/'.join(path_list), '/'.join(path_list_fid)))
+		try:
+			fcp_dec = self._cmd.rs.select(filename, self._cmd)
+			path_list = self._cmd.rs.selected_file.fully_qualified_path(True)
+			path_list_fid = self._cmd.rs.selected_file.fully_qualified_path(False)
+			self._cmd.poutput("# file:%s (%s)" % (path_list[-1], path_list_fid[-1]))
+
+			fd = fcp_dec['file_descriptor']
+			structure = fd['structure']
+			self._cmd.poutput("# structure: %s" % str(structure))
+
+			for f in path_list:
+				self._cmd.poutput("select " + str(f))
+
+			if structure == 'transparent':
+				result = self._cmd.rs.read_binary()
+				self._cmd.poutput("update_binary " + str(result[0]))
+			if structure == 'cyclic' or structure == 'linear_fixed':
+				num_of_rec = fd['num_of_rec']
+				for r in range(1, num_of_rec + 1):
+					result = self._cmd.rs.read_record(r)
+					self._cmd.poutput("update_record %d %s" % (r, str(result[0])))
+			fcp_dec = self._cmd.rs.select("..", self._cmd)
+		except Exception as e:
+			self._cmd.poutput("# bad file:%s, %s" % (str(filename), str(e)))
+
+		self._cmd.poutput("#")
+
+	export_parser = argparse.ArgumentParser()
+	export_parser.add_argument('--filename', type=str, default=None, help='only export specific file')
+
+	@cmd2.with_argparser(export_parser)
+	def do_export(self, opts):
+		"""Export files to script that can be imported back later"""
+		if opts.filename:
+			self.export(opts.filename)
+		else:
+			self.walk(0, self.export)
 
 
 @with_default_category('USIM Commands')
