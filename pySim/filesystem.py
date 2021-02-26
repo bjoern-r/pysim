@@ -34,6 +34,8 @@ import argparse
 from pySim.utils import sw_match, h2b, b2h
 from pySim.exceptions import *
 
+import pySim.ts_51_011
+
 class CardFile(object):
     """Base class for all objects in the smart card filesystem.
     Serve as a common ancestor to all other file types; rarely used directly.
@@ -241,8 +243,8 @@ class CardMF(CardDF):
 
     def decode_select_response(self, data_hex):
         """Decode the response to a SELECT command."""
-        return data_hex
 
+        return pySim.ts_51_011.decode_select_response(data_hex)
 
 
 class CardADF(CardDF):
