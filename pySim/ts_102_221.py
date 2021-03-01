@@ -126,13 +126,12 @@ FCP_prorietary_interpreter_map = {
 # accept unknown tags.  It also doesn't raise a specific exception type but
 # just the generic ValueError, so we cannot ignore those either.  Instead,
 # we insert a dict entry for every possible proprietary tag permitted
+#def fixup_fcp_proprietary_tlv_map(tlv_map):
 def fixup_fcp_proprietary_tlv_map(tlv_map):
-    if 'D0' in tlv_map:
-        return
-    for i in range(0xd0, 0xff):
+    for i in range(0x00, 0xff):
         i_hex = i2h([i]).upper()
-        tlv_map[i_hex] = 'proprietary_' + i_hex
-
+        if i_hex not in tlv_map:
+                tlv_map[i_hex] = 'proprietary_' + i_hex
 
 def tlv_key_replace(inmap, indata):
     def newkey(inmap, key):
