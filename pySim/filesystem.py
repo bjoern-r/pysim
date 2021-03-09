@@ -133,12 +133,43 @@ class CardFile(object):
 
 class CardDF(CardFile):
     """DF (Dedicated File) in the smart card filesystem.  Those are basically sub-directories."""
+
+    @with_default_category('DF/ADF Commands')
+    class ShellCommands(CommandSet):
+        def __init__(self):
+            super().__init__()
+
+        add_ef_parser = argparse.ArgumentParser()
+        add_ef_parser.add_argument('fid', type=str, default=None, help='file identifier (hexadecimal)')
+        add_ef_parser.add_argument('--name', type=str, default=None, help='human readable name')
+        add_ef_parser.add_argument('--desc', type=str, default=None, help='human readable description')
+        add_ef_parser.add_argument('--struct', type=str, default="TransparentEF", help='file structure (TransparentEF|LinFixedEF)')
+        @cmd2.with_argparser(add_ef_parser)
+
+        def do_add_ef(self, opts):
+            """Add an EF representation at the current position in the file system"""
+            selected_file = self._cmd.rs.selected_file
+
+            if not opts.name:
+                opts.name = "EF." + opts.fid
+            if not opts.desc:
+                opts.desc = "manually added at runtime"
+
+            if opts.struct == "TransparentEF":
+                ef = TransparentEF(fid=opts.fid, sfid=None, name=opts.name, desc=opts.desc)
+            elif opts.struct == "LinFixedEF":
+                ef = LinFixedEF(fid=opts.fid, sfid=None, name=opts.name, desc=opts.desc)
+            else:
+                self._cmd.poutput("add_ef: error: invalid file type specified")
+            selected_file.add_files([ef])
+
     def __init__(self, **kwargs):
         if not isinstance(self, CardADF):
             if not 'fid' in kwargs:
                 raise TypeError('fid is mandatory for all DF')
         super().__init__(**kwargs)
         self.children = dict()
+        self.shell_commands = [self.ShellCommands()]
 
     def __str__(self):
         return "DF(%s)" % (super().__str__())
