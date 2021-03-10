@@ -83,6 +83,14 @@ class PysimApp(cmd2.Cmd):
 		pin_adm = sanitize_pin_adm(arg)
 		self.card.verify_adm(h2b(pin_adm))
 
+	@cmd2.with_category(CUSTOM_CATEGORY)
+	def do_desc(self, opts):
+		"""Display human readable file description for the currently selected file"""
+		desc = self._cmd.rs.selected_file.desc
+		if desc:
+			self._cmd.poutput(desc)
+		else:
+			self._cmd.poutput("no description available")
 
 
 @with_default_category('ISO7816 Commands')
