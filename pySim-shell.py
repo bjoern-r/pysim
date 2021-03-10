@@ -286,4 +286,5 @@ if __name__ == '__main__':
 	rs.mf.add_application(ADF_ISIM())
 
 	app = PysimApp(card, rs)
+	rs.select('MF', app)
 	app.cmdloop()
