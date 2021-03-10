@@ -58,8 +58,6 @@ class PysimApp(cmd2.Cmd):
 		self.card = card
 		self.rs = rs
 		self.py_locals = { 'card': self.card, 'rs' : self.rs }
-		self.card.read_aids()
-		self.poutput('AIDs on card: %s' % (self.card._aids))
 		self.numeric_path = False
 		self.add_settable(cmd2.Settable('numeric_path', bool, 'Print File IDs instead of names',
 						  onchange_cb=self._onchange_numeric_path))
@@ -285,14 +283,26 @@ if __name__ == '__main__':
 		sys.exit(2)
 
 	profile = CardProfileUICC()
+
 	rs = RuntimeState(card, profile)
 
-	# FIXME: do this dynamically
 	rs.mf.add_file(DF_TELECOM())
 	rs.mf.add_file(DF_GSM())
-	rs.mf.add_application(ADF_USIM())
-	rs.mf.add_application(ADF_ISIM())
 
 	app = PysimApp(card, rs)
+	aids = card.read_aids()
+	if aids:
+		app.poutput("AIDs on card:")
+		for a in aids:
+			if "a0000000871002" in a:
+				app.poutput(" USIM: %s" % a)
+				rs.mf.add_application(ADF_USIM())
+			elif "a0000000871004" in a:
+				app.poutput(" ISIM: %s" % a)
+				rs.mf.add_application(ADF_ISIM())
+			else:
+				app.poutput(" unknown application: %s" % a)
+	else:
+		app.poutput("error: could not determine card applications")
 	rs.select('MF', app)
 	app.cmdloop()
