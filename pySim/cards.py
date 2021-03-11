@@ -857,8 +857,6 @@ class SysmoUSIMSJS1(UsimCard):
 		if not key:
 			raise ValueError("Please provide a PIN-ADM as there is no default one")
 		(res, sw) = self._scc.verify_chv(0x0A, key)
-		if sw != '9000':
-			raise RuntimeError('Failed to authenticate with ADM key %s'%(key))
 		return sw
 
 	def program(self, p):
@@ -1048,9 +1046,7 @@ class FairwavesSIM(UsimCard):
 		# authenticate as ADM1
 		if not p['pin_adm']:
 			raise ValueError("Please provide a PIN-ADM as there is no default one")
-		sw = self.verify_adm(h2b(p['pin_adm']))
-		if sw != '9000':
-			raise RuntimeError('Failed to authenticate with ADM key %s'%(p['pin_adm'],))
+		self.verify_adm(h2b(p['pin_adm']))
 
 		# TODO: Set operator name
 		if p.get('smsp') is not None:
@@ -1155,9 +1151,7 @@ class WavemobileSim(UsimCard):
 	def program(self, p):
 		if not p['pin_adm']:
 			raise ValueError("Please provide a PIN-ADM as there is no default one")
-		sw = self.verify_adm(h2b(p['pin_adm']))
-		if sw != '9000':
-			raise RuntimeError('Failed to authenticate with ADM key %s'%(p['pin_adm'],))
+		self.verify_adm(h2b(p['pin_adm']))
 
 		# EF.ICCID
 		# TODO: Add programming of the ICCID
@@ -1257,8 +1251,6 @@ class SysmoISIMSJA2(UsimCard, IsimCard):
 		if not key:
 			raise ValueError("Please provide a PIN-ADM as there is no default one")
 		(res, sw) = self._scc.verify_chv(0x0A, key)
-		if sw != '9000':
-			raise RuntimeError('Failed to authenticate with ADM key %s'%(key))
 		return sw
 
 	def program(self, p):
