@@ -114,6 +114,11 @@ def parse_options():
 			default=2,
 			choices=[2, 3],
 		)
+	parser.add_option("--ueopmode", dest="ueopmode", type="choice",
+		help="UE operation mode in EFad (TS 31.102 ch 4.2.18)[default: %default]",
+		default=None,
+		choices=['00', '80', '81', '02', '04'],
+	)
 	parser.add_option("-m", "--smsc", dest="smsc",
 			help="SMSC number (Start with + for international no.) [default: '00 + country code + 5555']",
 		)
