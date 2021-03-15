@@ -166,9 +166,9 @@ if __name__ == '__main__':
 
 	# EF.PLMNsel
 	try:
-		(res, sw) = card.read_binary('PLMNsel')
+		(res, sw) = card.read_plmnsel()
 		if sw == '9000':
-			print("PLMNsel: %s" % (res))
+			print("PLMNsel:\n%s" % (res))
 		else:
 			print("PLMNsel: Can't read, response code = %s" % (sw,))
 	except Exception as e:
