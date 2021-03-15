@@ -133,6 +133,24 @@ class UsimCommands(CommandSet):
 		(res, sw) = self._cmd.card.read_ehplmn()
 		self._cmd.poutput(res)
 
+	def do_read_ad(self, _):
+		"""Read EF.AD"""
+		self._cmd.card.select_adf_by_aid(adf="usim")
+		(res, sw) = card.read_binary('AD')
+		if sw == '9000':
+			self._cmd.poutput("Administrative data: %s" % (res,))
+			if res[:2] in EF_AD_mode_map:
+				self._cmd.poutput("\tMS operation mode: %s" % (EF_AD_mode_map[res[:2]],))
+			else:
+				self._cmd.poutput("\tMS operation mode: (unknown 0x%s)" % (res[:2],))
+			if int(res[4:6], 16) & 0x01:
+				self._cmd.poutput("\tCiphering Indicator: enabled")
+			else:
+				self._cmd.poutput("\tCiphering Indicator: disabled")
+			self._cmd.poutput("\tMNC Length: 0x%s" % (res[6:8],))
+		else:
+			self._cmd.poutput("AD: Can't read, response code = %s" % (sw,))
+
 def parse_options():
 
 	parser = OptionParser(usage="usage: %prog [options]")
