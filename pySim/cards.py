@@ -142,6 +142,13 @@ class Card(object):
 		data, sw = self._scc.update_binary(EF['PLMNwAcT'], content + 'ffffff0000' * (size // 5 - 1))
 		return sw
 
+	def read_plmnsel(self):
+		(res, sw) = self._scc.read_binary(EF['PLMNsel'])
+		if sw == '9000':
+			return (format_xplmn(res), sw)
+		else:
+			return (None, sw)
+
 	def update_plmnsel(self, mcc, mnc):
 		data = self._scc.read_binary(EF['PLMNsel'], length=None, offset=0)
 		size = len(data[0]) // 2
