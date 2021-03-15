@@ -177,13 +177,18 @@ def dec_xplmn_w_act(fivehexbytes):
 
 def format_xplmn_w_act(hexstr):
 	s = ""
+	unused=0
 	for rec_data in hexstr_to_Nbytearr(hexstr, 5):
 		rec_info = dec_xplmn_w_act(rec_data)
 		if rec_info['mcc'] == 0xFFF and rec_info['mnc'] == 0xFFF:
 			rec_str = "unused"
+			unused += 1
+			continue
 		else:
 			rec_str = "MCC: %03d MNC: %03d AcT: %s" % (rec_info['mcc'], rec_info['mnc'], ", ".join(rec_info['act']))
 		s += "\t%s # %s\n" % (rec_data, rec_str)
+	if unused >0:
+		s += "\t.. %d unused entries\n" %(unused)
 	return s
 
 def dec_loci(hexstr):
@@ -226,13 +231,18 @@ def dec_xplmn(threehexbytes):
 
 def format_xplmn(hexstr):
 	s = ""
+	unused = 0
 	for rec_data in hexstr_to_Nbytearr(hexstr, 3):
 		rec_info = dec_xplmn(rec_data)
 		if rec_info['mcc'] == 0xFFF and rec_info['mnc'] == 0xFFF:
 			rec_str = "unused"
+			unused += 1
+			continue
 		else:
 			rec_str = "MCC: %03d MNC: %03d" % (rec_info['mcc'], rec_info['mnc'])
 		s += "\t%s # %s\n" % (rec_data, rec_str)
+	if unused >0:
+		s += "\t.. %d unused entries\n" %(unused)
 	return s
 
 def derive_milenage_opc(ki_hex, op_hex):
