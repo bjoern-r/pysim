@@ -153,21 +153,35 @@ class Card(object):
 		data, sw = self._scc.update_record(EF['SMSP'], 1, rpad(smsp, 84))
 		return sw
 
-	def update_ad(self, mnc):
+	def update_ad(self, mnc=None, ue_operation_mode=None):
 		#See also: 3GPP TS 31.102, chapter 4.2.18
-		mnclen = len(str(mnc))
-		if mnclen == 1:
-			mnclen = 2
-		if mnclen > 3:
-			raise RuntimeError('unable to calculate proper mnclen')
+		if not mnc == None:
+			mnclen = len(str(mnc))
+			if mnclen == 1:
+				mnclen = 2
+			if mnclen > 3:
+				raise RuntimeError('unable to calculate proper mnclen')
 
 		data, sw = self._scc.read_binary(EF['AD'], length=None, offset=0)
 
 		# Reset contents to EF.AD in case the file is uninintalized
 		if data.lower() == "ffffffff":
-			data = "00000000"
+			if ue_operation_mode:
+				data = ue_operation_mode[:2]+"000000"
+			else:
+				data = "00000000"
 
-		content = data[0:6] + "%02X" % mnclen
+		if ue_operation_mode:
+			content = ue_operation_mode[:2]
+		else:
+			content = data[:2]
+
+		content = content + data[2:6]
+
+		if mnc:
+			content += "%02X" % mnclen
+		else:
+			content += data[6:8]
 		data, sw = self._scc.update_binary(EF['AD'], content)
 		return sw
 
@@ -915,7 +929,7 @@ class SysmoUSIMSJS1(UsimCard):
 
 		# EF.AD
 		if p.get('mcc') and p.get('mnc'):
-			sw = self.update_ad(p['mnc'])
+			sw = self.update_ad(p['mnc'],ue_operation_mode=p['ueopmode'])
 			if sw != '9000':
 				print("Programming AD failed with code %s"%sw)
 
@@ -1301,7 +1315,7 @@ class SysmoISIMSJA2(UsimCard, IsimCard):
 
 		# EF.AD
 		if p.get('mcc') and p.get('mnc'):
-			sw = self.update_ad(p['mnc'])
+			sw = self.update_ad(p['mnc'],ue_operation_mode=p['ueopmode'])
 			if sw != '9000':
 				print("Programming AD failed with code %s"%sw)
 

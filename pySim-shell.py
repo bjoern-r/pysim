@@ -151,6 +151,16 @@ class UsimCommands(CommandSet):
 		else:
 			self._cmd.poutput("AD: Can't read, response code = %s" % (sw,))
 
+	def do_write_ad_mnclen(self, opts):
+		"""Write mnclen to EF.AD"""
+		#self._cmd.poutput(opts)
+		self._cmd.card.update_ad(mnc=opts)
+
+	def do_write_ad_ue_opmode(self, opts):
+		"""Write UE operation mode to EF.AD"""
+		self._cmd.card.update_ad(ue_operation_mode=opts)
+
+
 def parse_options():
 
 	parser = OptionParser(usage="usage: %prog [options]")
