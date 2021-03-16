@@ -936,7 +936,7 @@ class SysmoUSIMSJS1(UsimCard):
 
 		# EF.AD
 		if p.get('mcc') and p.get('mnc'):
-			sw = self.update_ad(p['mnc'],ue_operation_mode=p['ueopmode'])
+			sw = self.update_ad(p['mnc'],ue_operation_mode=p.get('ueopmode', None))
 			if sw != '9000':
 				print("Programming AD failed with code %s"%sw)
 
