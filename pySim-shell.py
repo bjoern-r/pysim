@@ -28,6 +28,7 @@ import argparse
 
 import os
 import sys
+import distutils.util
 from optparse import OptionParser
 
 from pySim.ts_51_011 import EF, DF, EF_SST_map, EF_AD_mode_map
@@ -37,7 +38,7 @@ from pySim.ts_31_103 import EF_IST_map, EF_ISIM_ADF_map
 from pySim.exceptions import *
 from pySim.commands import SimCardCommands
 from pySim.cards import card_detect, Card
-from pySim.utils import h2b, swap_nibbles, rpad, h2s
+from pySim.utils import h2b, swap_nibbles, rpad, h2s, enc_plmn
 from pySim.utils import dec_st, init_reader, sanitize_pin_adm
 from pySim.card_handler import card_handler
 
@@ -159,6 +160,42 @@ class UsimCommands(CommandSet):
 	def do_write_ad_ue_opmode(self, opts):
 		"""Write UE operation mode to EF.AD"""
 		self._cmd.card.update_ad(ue_operation_mode=opts)
+
+	def do_write_ehplmn(self, opts):
+		"""Write ehplmn list"""
+		self._cmd.card.select_adf_by_aid(adf="usim")
+		plmns = ''
+		for plmn in opts.split(' '):
+			if len(plmn) in [5, 6]:
+				plmns += enc_plmn(plmn[:3], plmn[3:])
+			else:
+				self._cmd.poutput('Could not parse plmn, entry to long')
+		self._cmd.poutput('PLMN list: ' + plmns)
+		data, sw = self._cmd.card._scc.update_binary(EF_USIM_ADF_map['EHPLMN'], plmns)
+
+	def do_write_hplmn_act(self, opts):
+		"""Write HPLMN list"""
+		plmn, act = opts.split(" ")
+		self._cmd.card.select_adf_by_aid(adf="usim")
+		self._cmd.card.update_hplmn_act(plmn[:3], plmn[3:], act)
+
+	def do_write_spn(self, opts):
+		"""Write SPN"""
+		self._cmd.card.select_adf_by_aid(adf="usim")
+		tmp = opts.split(' ')
+		if len(tmp) == 1:
+			self._cmd.card.update_spn(name=tmp[0])
+		elif len(tmp) == 3:
+			self._cmd.card.update_spn(name=tmp[0],
+									  hplmn_disp=bool(distutils.util.strtobool(tmp[1])),
+									  oplmn_disp=bool(distutils.util.strtobool(tmp[2])))
+		else:
+			self._cmd.poutput("Can't parse spn")
+
+	def do_read_spn(self, opts):
+		"""Read SPN"""
+		self._cmd.card.select_adf_by_aid(adf="usim")
+		self._cmd.poutput(self._cmd.card.read_spn())
 
 
 def parse_options():
