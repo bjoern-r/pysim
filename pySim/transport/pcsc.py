@@ -27,6 +27,7 @@ from smartcard.Exceptions import NoCardException, CardRequestTimeoutException, C
 from smartcard.System import readers
 from smartcard.ExclusiveConnectCardConnection import ExclusiveConnectCardConnection
 from smartcard.ATR import ATR
+from smartcard.scard import SCARD_W_REMOVED_CARD, SCARD_E_NO_SMARTCARD
 
 from osmocom.utils import h2i, i2h, Hexstr
 
@@ -106,7 +107,15 @@ class PcscSimLink(LinkBaseTpdu):
             raise NoCardError() from exc
 
     def get_atr(self) -> Hexstr:
-        return i2h(self._con.getATR())
+        try:
+            return i2h(self._con.getATR())
+        except CardConnectionException as exc:
+            # Same rationale as send_tpdu() -- lets callers use this as a cheap liveness
+            # probe for "is the card I already connected to still actually there?" without
+            # needing to know PC/SC result codes.
+            if getattr(exc, 'hresult', None) in (SCARD_W_REMOVED_CARD, SCARD_E_NO_SMARTCARD):
+                raise NoCardError(str(exc)) from exc
+            raise
 
     def disconnect(self):
         self._con.disconnect()
@@ -117,7 +126,18 @@ class PcscSimLink(LinkBaseTpdu):
         return 1
 
     def send_tpdu(self, tpdu: Hexstr) -> ResTuple:
-        data, sw1, sw2 = self._con.transmit(h2i(tpdu))
+        try:
+            data, sw1, sw2 = self._con.transmit(h2i(tpdu))
+        except CardConnectionException as exc:
+            # pyscard reports a card that was physically removed (or otherwise vanished,
+            # e.g. reader unplugged) as a generic CardConnectionException; the PC/SC
+            # result code in exc.hresult is what actually distinguishes this from other
+            # transmission errors. Surface it as the same NoCardError callers already
+            # handle for "no card in the reader" so they don't need to know about PC/SC
+            # error codes to detect a removed card mid-transaction.
+            if getattr(exc, 'hresult', None) in (SCARD_W_REMOVED_CARD, SCARD_E_NO_SMARTCARD):
+                raise NoCardError(str(exc)) from exc
+            raise
         sw = [sw1, sw2]
 
         # Return value
