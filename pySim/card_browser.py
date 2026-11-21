@@ -48,7 +48,7 @@ from pySim.log import PySimLogger
 log = PySimLogger.get(__name__)
 
 # Synthetic tree entry (not a real CardFile) that shows the same overview
-# pySim-summary.py/pySim-summary-web.py print/display -- see CardSession.read_file().
+# card-summary.py/card-summary-web.py print/display -- see CardSession.read_file().
 SUMMARY_PATH = 'Summary'
 
 
@@ -330,7 +330,7 @@ class CardSession:
             return result
 
     def _read_summary_uncached(self) -> dict:
-        """Build the same card summary pySim-summary.py prints (ICCID/IMSI/SPN/EHPLMN/ARA-M/
+        """Build the same card summary card-summary.py prints (ICCID/IMSI/SPN/EHPLMN/ARA-M/
         ADM-key-database status), reusing the already-detected RuntimeState/card instead of
         re-running init_card() (which build_summary() would otherwise do)."""
         if self.rs is None:
@@ -387,7 +387,7 @@ class CardSession:
 
     def verify_adm(self, pin: Optional[str] = None, pin_is_hex: bool = False,
                    adm_type: Optional[str] = None) -> dict:
-        """Authenticate the current session with the card's ADM (Administrator) PIN, the same
+        """Authenticate the current session with the card's ADM PIN, the same
         way pySim-shell's 'verify_adm' command does: if no PIN is given, look one up from the
         configured ADM key database (CSV/PostgreSQL) by ICCID. On success, clears the tree/
         content caches, since files that previously failed with "security status not

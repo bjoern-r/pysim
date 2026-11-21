@@ -1610,7 +1610,9 @@ class CardModel(abc.ABC):
     def match(cls, scc: SimCardCommands) -> bool:
         """Test if given card matches this model."""
         card_atr = scc.get_atr()
+        #print("CARD ATR: ",card_atr)
         for atr in cls._atrs:
+            #print(atr, " == ", card_atr)
             if atr == card_atr:
                 log.info("Detected CardModel: %s", cls.__name__)
                 return True
