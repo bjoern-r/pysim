@@ -27,7 +27,7 @@ from typing import Optional
 
 from pySim.transport import init_reader, argparse_add_reader_args, LinkBase
 from pySim.card_key_provider import card_key_provider_argparse_add_args, card_key_provider_init
-from pySim.card_summary import build_summary
+from pySim.card_summary import build_summary, UST_SERVICE_EHPLMN, UST_SERVICE_SUCI_PRIVACY, UST_SERVICE_SUCI_CALCULATION, SUCI_PROT_SCHEME_IDENTIFIERS
 from pySim.exceptions import NoCardError
 from pySim.log import PySimLogger
 
@@ -49,6 +49,13 @@ def format_plmn_list(plmns: Optional[list]) -> str:
     if not plmns:
         return "\tNot available"
     return "\n".join("\tMCC: %s MNC: %s" % (p['mcc'], p['mnc']) for p in plmns)
+
+
+def enabled_str(enabled: Optional[bool]) -> str:
+    """Human-readable status of an EF.UST service (True/False/unknown)."""
+    if enabled is None:
+        return "unknown (EF.UST not readable)"
+    return "enabled" if enabled else "disabled"
 
 
 def print_summary(sl: LinkBase) -> bool:
@@ -92,8 +99,30 @@ def print_summary(sl: LinkBase) -> bool:
     else:
         print("SPN:   Not available")
 
-    print("EHPLMN:")
+    print("EHPLMN (EF.UST service %d: %s):" % (UST_SERVICE_EHPLMN, enabled_str(data.get('ehplmn_service_enabled'))))
     print(format_plmn_list(data['ehplmn']))
+
+    print()
+    print("SUCI (subscriber identifier encryption):")
+    suci = data.get('suci')
+    if suci is None:
+        print("\tNot available (no USIM application on this card)")
+    else:
+        print("\tSubscription identifier privacy (EF.UST service %d): %s" %
+              (UST_SERVICE_SUCI_PRIVACY, enabled_str(suci['privacy_service_enabled'])))
+        print("\tSUCI calculation by the USIM (EF.UST service %d): %s" %
+              (UST_SERVICE_SUCI_CALCULATION, enabled_str(suci['calculation_service_enabled'])))
+        for scheme in suci.get('prot_scheme_id_list') or []:
+            print("\tProtection scheme (priority %s): %s, key %s" %
+                  (scheme.get('priority'), SUCI_PROT_SCHEME_IDENTIFIERS.get(scheme.get('identifier'), 'unknown'),
+                   scheme.get('key_index')))
+        keys = suci.get('hnet_pubkeys') or []
+        if keys:
+            print("\tHome network public keys (EF.SUCI_Calc_Info):")
+            for key in keys:
+                print("\t\tIdentifier %s: %s" % (key['hnet_pubkey_identifier'], key['hnet_pubkey'] or "Not available"))
+        else:
+            print("\tHome network public keys (EF.SUCI_Calc_Info): Not available")
 
     print()
     print("ARA-M access rules:")

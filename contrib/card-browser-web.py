@@ -381,6 +381,12 @@ function admText(adm_known) {
   return 'Not configured (no ADM key database file found)';
 }
 
+function enabledText(enabled) {
+  if (enabled === true) return 'enabled';
+  if (enabled === false) return 'disabled';
+  return 'unknown (EF.UST not readable)';
+}
+
 let lastAtr = undefined;
 let selectedLabel = null;
 let currentPath = null;
@@ -539,8 +545,35 @@ function renderFileContent(data) {
     const ehplmnText = (s.ehplmn && s.ehplmn.length)
         ? s.ehplmn.map((p) => p.mcc + '-' + p.mnc).join(', ')
         : 'Not available';
-    row(st, 'EHPLMN', ehplmnText);
+    row(st, 'EHPLMN', ehplmnText + ' (EF.UST service 71: ' + enabledText(s.ehplmn_service_enabled) + ')');
     detailBody.appendChild(st);
+
+    detailBody.appendChild(el('div', {text: 'SUCI (subscriber identifier encryption)', class: 'section-title'}));
+    const suci = s.suci;
+    if (!suci) {
+      detailBody.appendChild(el('p', {text: 'Not available (no USIM application on this card)', class: 'muted'}));
+    } else {
+      const suciTable = el('table');
+      row(suciTable, 'Subscription identifier privacy (EF.UST service 124)', enabledText(suci.privacy_service_enabled));
+      row(suciTable, 'SUCI calculation by the USIM (EF.UST service 125)', enabledText(suci.calculation_service_enabled));
+      detailBody.appendChild(suciTable);
+      (suci.prot_scheme_id_list || []).forEach((scheme) => {
+        const schemeName = {0: 'Profile A (ECIES Curve25519)', 1: 'Profile B (ECIES P-256)'}[scheme.identifier] || 'unknown';
+        detailBody.appendChild(el('p', {text: 'Protection scheme (priority ' + scheme.priority + '): ' +
+            schemeName + ', key ' + scheme.key_index, class: 'muted'}));
+      });
+      const keys = suci.hnet_pubkeys || [];
+      if (keys.length) {
+        detailBody.appendChild(el('div', {text: 'Home network public keys (EF.SUCI_Calc_Info)', class: 'section-title'}));
+        const kt = el('table');
+        keys.forEach((key) => {
+          row(kt, 'Identifier ' + key.hnet_pubkey_identifier, key.hnet_pubkey || 'Not available');
+        });
+        detailBody.appendChild(kt);
+      } else {
+        detailBody.appendChild(el('p', {text: 'Home network public keys (EF.SUCI_Calc_Info): Not available', class: 'muted'}));
+      }
+    }
 
     detailBody.appendChild(el('div', {text: 'ARA-M access rules', class: 'section-title'}));
     if (s.aram_rules === null || s.aram_rules === undefined) {

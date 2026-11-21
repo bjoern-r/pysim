@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """Build a structured summary of an inserted SIM/USIM card's configuration
-(ICCID, IMSI, SPN, EHPLMN, ARA-M access rules, ADM key database status, ...).
+(ICCID, IMSI, SPN, EHPLMN + EF.UST service state, SUCI parameters, ARA-M access
+rules, ADM key database status, ...).
 
 This module contains no I/O beyond talking to the card and the configured ADM
 key database -- it returns plain data structures. It is shared by the CLI tool
@@ -34,8 +35,19 @@ from pySim.ara_m import ADF_ARAM
 from pySim.card_key_provider import card_key_provider_get_field, card_key_providers
 from pySim.exceptions import SwMatchError
 from pySim.log import PySimLogger
+from pySim.utils import b2h
 
 log = PySimLogger.get(__name__)
+
+# 3GPP TS 31.102 USIM Service Table (EF.UST) service numbers relevant to the summary
+UST_SERVICE_EHPLMN = 71             # Equivalent HPLMN (gates the EF.EHPLMN presence)
+UST_SERVICE_SUCI_PRIVACY = 124      # Subscription identifier privacy support (gates EF.SUCI_Calc_Info)
+UST_SERVICE_SUCI_CALCULATION = 125  # SUCI calculation by the USIM
+
+# Protection Scheme Identifier of the EF.SUCI_Calc_Info home network public keys:
+# SUCI concealment Profile A (ECIES Curve25519) / Profile B (ECIES P-256)
+# (3GPP TS 33.501 Annex C.3, TS 31.102 Section 4.4.11.6.2)
+SUCI_PROT_SCHEME_IDENTIFIERS = {0: 'Profile A (ECIES Curve25519)', 1: 'Profile B (ECIES P-256)'}
 
 
 def read_ef(lchan: RuntimeLchan, path: str) -> Optional[dict]:
@@ -115,6 +127,15 @@ def read_aram_rules(lchan: RuntimeLchan) -> Optional[list]:
     return rules
 
 
+def ust_service_enabled(ust: Optional[dict], service: int) -> Optional[bool]:
+    """Return whether the given EF.UST service number is marked 'activated' in a decoded
+    USIM Service Table ({service_nr: {'activated': bool, 'description': str}}). Returns
+    None if the EF.UST could not be read (e.g. no USIM application or read failure)."""
+    if ust is None:
+        return None
+    return bool(ust.get(service, {}).get('activated', False))
+
+
 def check_adm_known(iccid: str) -> Optional[bool]:
     """Check whether an ADM1 key is on record for this card's ICCID in the configured ADM
     key database(s) (CSV/PostgreSQL), the same lookup pySim-shell's 'verify_adm' command
@@ -136,8 +157,8 @@ def build_summary(sl: LinkBase) -> dict:
 
     Returned dict always has 'card_type' and 'atr'. If 'error' is set, the profile could not
     be detected and no further fields are populated. Otherwise 'applications', 'iccid',
-    'adm_known', 'imsi', 'spn', 'ehplmn' and 'aram_rules' are populated (some possibly None/
-    empty if not present/readable on this card).
+    'adm_known', 'imsi', 'spn', 'ehplmn', 'ehplmn_service_enabled', 'suci' and 'aram_rules'
+    are populated (some possibly None/empty if not present/readable on this card).
     """
     # Detect the card and set up its filesystem/profile model, just like pySim-shell does
     rs, card = init_card(sl)
@@ -159,6 +180,8 @@ def build_summary_from_rs(rs, card) -> dict:
         'imsi': None,
         'spn': None,
         'ehplmn': [],
+        'ehplmn_service_enabled': None,
+        'suci': None,
         'aram_rules': None,
     }
 
@@ -182,14 +205,18 @@ def build_summary_from_rs(rs, card) -> dict:
         result['adm_known'] = check_adm_known(result['iccid'])
 
     # IMSI/SPN live under ADF.USIM on a UICC with a USIM application, or under the
-    # legacy DF.GSM on a classic (2G-only) SIM. EHPLMN is USIM-specific.
+    # legacy DF.GSM on a classic (2G-only) SIM. EHPLMN, EF.UST and the SUCI parameters
+    # are USIM-specific.
     selectables = rs.mf.get_selectables()
     if 'ADF.USIM' in selectables:
         imsi_path, spn_path, ehplmn_path = 'MF/ADF.USIM/EF.IMSI', 'MF/ADF.USIM/EF.SPN', 'MF/ADF.USIM/EF.EHPLMN'
+        ust_path, suci_calc_info_path = 'MF/ADF.USIM/EF.UST', 'MF/ADF.USIM/DF.5GS/EF.SUCI_Calc_Info'
     elif 'DF.GSM' in selectables:
         imsi_path, spn_path, ehplmn_path = 'MF/DF.GSM/EF.IMSI', 'MF/DF.GSM/EF.SPN', None
+        ust_path = suci_calc_info_path = None
     else:
         imsi_path = spn_path = ehplmn_path = None
+        ust_path = suci_calc_info_path = None
 
     imsi = read_ef(lchan, imsi_path) if imsi_path else None
     result['imsi'] = imsi['imsi'] if imsi else None
@@ -202,6 +229,33 @@ def build_summary_from_rs(rs, card) -> dict:
     ehplmn = read_ef(lchan, ehplmn_path) if ehplmn_path else None
     if ehplmn is not None:
         result['ehplmn'] = [p for p in ehplmn if p]
+
+    # The EF.UST (USIM Service Table) tells which optional services are enabled: the
+    # EHPLMN service n°71 gates the EF.EHPLMN read above, and the SUCI-related services
+    # indicate whether the subscriber identifier is concealed ("SUCI encryption"):
+    # n°124 enables the EF.SUCI_Calc_Info holding the home network public keys, while
+    # n°125 means the USIM itself performs the SUCI calculation (3GPP TS 31.102).
+    ust = read_ef(lchan, ust_path) if ust_path else None
+    result['ehplmn_service_enabled'] = ust_service_enabled(ust, UST_SERVICE_EHPLMN)
+    if ust_path:
+        suci = {
+            'privacy_service_enabled': ust_service_enabled(ust, UST_SERVICE_SUCI_PRIVACY),
+            'calculation_service_enabled': ust_service_enabled(ust, UST_SERVICE_SUCI_CALCULATION),
+            'prot_scheme_id_list': [],
+            'hnet_pubkeys': [],
+        }
+        suci_calc_info = read_ef(lchan, suci_calc_info_path) if suci_calc_info_path else None
+        if suci_calc_info:
+            suci['prot_scheme_id_list'] = suci_calc_info.get('prot_scheme_id_list') or []
+            # 'hnet_pubkey' is raw bytes in pySim's decoded representation; convert it to a
+            # hex string so the renderers (and the plain json.dumps of the web tool) can
+            # display it as-is.
+            suci['hnet_pubkeys'] = [
+                {'hnet_pubkey_identifier': key.get('hnet_pubkey_identifier'),
+                 'hnet_pubkey': b2h(key['hnet_pubkey']) if key.get('hnet_pubkey') else None}
+                for key in suci_calc_info.get('hnet_pubkey_list') or []
+            ]
+        result['suci'] = suci
 
     result['aram_rules'] = read_aram_rules(lchan)
 
